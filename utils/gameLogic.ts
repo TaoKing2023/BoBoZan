@@ -1,5 +1,6 @@
 
 
+
 import { ActionType, RoundResult, PlayerState, Faction, ACTION_DETAILS, GameMode } from '../types';
 
 // CYCLE: PEGASUS > ICE > COTTON > PEGASUS
@@ -67,17 +68,32 @@ export const resolveRoundTriPhase = (
 
   // Player Defending
   if (isPDefense && !isAiDefense) {
-    // Basic Defend only blocks T1
+    // Basic Defend (If reachable somehow)
     if (pAction === ActionType.DEFEND) {
       if (aiTier === 1) return { result: RoundResult.CONTINUE, message: "普通防御挡住了普通攻击。" };
       return { result: RoundResult.AI_WINS, message: "普通防御挡不住强力攻击！" };
     }
-    // Elemental Defend (Blocks specific Faction)
+    
+    // Elemental Defend
     if (pFaction && aiFaction) {
-      if (DEFENSE_TARGETS[pFaction] === aiFaction) {
-        return { result: RoundResult.CONTINUE, message: `完美防御！${ACTION_DETAILS[pAction].label}挡下了${ACTION_DETAILS[aiAction].label}。` };
+      // Logic Update: Faction Defense blocks ALL T1 attacks.
+      // For T2 and T3, it only blocks if it is the specific counter.
+      
+      const isCounterDefense = DEFENSE_TARGETS[pFaction] === aiFaction;
+
+      if (aiTier === 1) {
+          // Block T1 always
+          if (isCounterDefense) {
+             return { result: RoundResult.CONTINUE, message: `完美防御！${ACTION_DETAILS[pAction].label}轻松挡下了${ACTION_DETAILS[aiAction].label}。` };
+          }
+          return { result: RoundResult.CONTINUE, message: `防御成功！${ACTION_DETAILS[pAction].label}勉强挡住了${ACTION_DETAILS[aiAction].label}。` };
+      } else {
+          // T2+ requires strict counter
+          if (isCounterDefense) {
+             return { result: RoundResult.CONTINUE, message: `完美防御！${ACTION_DETAILS[pAction].label}化解了${ACTION_DETAILS[aiAction].label}。` };
+          }
+          return { result: RoundResult.AI_WINS, message: `防御属性错误！${ACTION_DETAILS[pAction].label}无法抵挡T${aiTier}强攻！` };
       }
-      return { result: RoundResult.AI_WINS, message: "防御属性错误！护盾被击穿！" };
     }
     // Fallback logic
     return { result: RoundResult.AI_WINS, message: "防御失效。" };
@@ -90,10 +106,20 @@ export const resolveRoundTriPhase = (
       return { result: RoundResult.PLAYER_WINS, message: "你的攻击击穿了普通防御！" };
     }
     if (pFaction && aiFaction) {
-      if (DEFENSE_TARGETS[aiFaction] === pFaction) {
-        return { result: RoundResult.CONTINUE, message: `攻击无效！对手的${ACTION_DETAILS[aiAction].label}完美克制了你。` };
+      const isCounterDefense = DEFENSE_TARGETS[aiFaction] === pFaction;
+
+      if (pTier === 1) {
+           if (isCounterDefense) {
+               return { result: RoundResult.CONTINUE, message: `攻击无效！对手的${ACTION_DETAILS[aiAction].label}完美克制了你。` };
+           }
+           return { result: RoundResult.CONTINUE, message: `攻击被挡住！对手的${ACTION_DETAILS[aiAction].label}防住了你的T1攻击。` };
+      } else {
+           // T2+
+           if (isCounterDefense) {
+               return { result: RoundResult.CONTINUE, message: `攻击无效！对手的${ACTION_DETAILS[aiAction].label}完美克制了你。` };
+           }
+           return { result: RoundResult.PLAYER_WINS, message: "对手防御属性错误，被你的强攻穿透！" };
       }
-      return { result: RoundResult.PLAYER_WINS, message: "对手防御属性错误，被你击中！" };
     }
     return { result: RoundResult.PLAYER_WINS, message: "对手防御失效！" };
   }
@@ -198,30 +224,35 @@ export const getAIAction = (aiState: PlayerState, mode: GameMode): ActionType =>
     const energy = aiState.energy;
     
     // 2. Build available move pool
-    let options: ActionType[] = [ActionType.CHARGE, ActionType.DEFEND]; // Always available
+    // NO ORDINARY DEFENSE IN TRI-PHASE
+    let options: ActionType[] = [ActionType.CHARGE]; 
     
+    // Faction Defenses (always available if 0 energy or needed)
+    const defenses = [ActionType.PEGASUS_DEF_ELE, ActionType.ICE_DEF_ELE, ActionType.COTTON_DEF_ELE];
+
     // Let's make AI random but capable
     const allMoves = Object.keys(ACTION_DETAILS) as ActionType[];
     const validMoves = allMoves.filter(m => {
         // Exclude classic specific moves if in Tri-phase
-        if (['MAGIC_DEFEND', 'ATTACK_SMALL', 'ATTACK_BIG'].includes(m)) return false;
+        if (['MAGIC_DEFEND', 'ATTACK_SMALL', 'ATTACK_BIG', 'DEFEND'].includes(m)) return false;
         
         const cost = ACTION_DETAILS[m].cost;
         const minEnergy = ACTION_DETAILS[m].minEnergy;
         return energy >= minEnergy;
     });
 
-    // If Energy 0: Charge (50%), Basic Defend (20%), Faction Defend (30%)
+    // If Energy 0: Charge (50%), Faction Defend (50%)
     if (energy === 0) {
         const r = Math.random();
         if (r < 0.5) return ActionType.CHARGE;
-        if (r < 0.7) return ActionType.DEFEND;
         // Pick a random elemental defense
-        const defs = [ActionType.PEGASUS_DEF_ELE, ActionType.ICE_DEF_ELE, ActionType.COTTON_DEF_ELE];
-        return defs[Math.floor(Math.random() * defs.length)];
+        return defenses[Math.floor(Math.random() * defenses.length)];
     }
 
     // If Energy > 0: Mix of Attack and Defense
+    // Add Defenses to valid moves pool to ensure AI defends sometimes
+    validMoves.push(...defenses);
+    
     return validMoves[Math.floor(Math.random() * validMoves.length)];
   }
 };

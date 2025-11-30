@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ActionType, GameStatus, PlayerState, RoundResult, LogEntry, ACTION_DETAILS, GameMode, Faction } from './types';
 import { resolveRound, resolveRoundTriPhase, getAIAction } from './utils/gameLogic';
@@ -528,7 +530,7 @@ const App: React.FC = () => {
 
                {logs.length > 0 ? (
                  <div className={`bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl p-6 text-center max-w-sm transform transition-all animate-in fade-in zoom-in duration-300 ${
-                     logs[0].result === RoundResult.PLAYER_WINS || (gameMode === GameMode.TRI_PHASE_TUTORIAL && tutorialStep === 4 && logs[0].resultMessage.includes('完美防御')) ? 'border-4 border-blue-500 shadow-blue-200' : 'border border-slate-100'
+                     logs[0].result === RoundResult.PLAYER_WINS || (gameMode === GameMode.TRI_PHASE_TUTORIAL && tutorialStep === 4 && logs[0].resultMessage.includes('完美防御')) || logs[0].resultMessage.includes('完美防御') || logs[0].resultMessage.includes('防御成功') ? 'border-4 border-blue-500 shadow-blue-200' : 'border border-slate-100'
                  }`}>
                     <p className="text-xl font-bold text-slate-800 arcade-font leading-relaxed">{logs[0].resultMessage}</p>
                     {!(gameMode === GameMode.TUTORIAL || gameMode === GameMode.TRI_PHASE_TUTORIAL) && <p className="text-xs text-slate-400 mt-3 font-mono">第 {logs[0].round} 回合</p>}
@@ -645,8 +647,7 @@ const App: React.FC = () => {
                       <section>
                          <h4 className="font-bold text-slate-700 mb-2">防御规则</h4>
                          <ul className="text-sm text-slate-600 space-y-1 list-disc pl-4">
-                            <li><span className="font-bold">普通防御</span>：只能防御T1级别的攻击。</li>
-                            <li><span className="font-bold">属性防御</span>：0消耗。可以防御该属性克制的流派的所有攻击（T1-T3）。例如：天马克制寒冰，所以【天马防】可以完美防御【寒冰】流派的所有攻击。</li>
+                            <li><span className="font-bold">属性防御</span>：0消耗。可防御所有T1攻击。但对于T2及以上的强力攻击，只有属性克制的防御才能抵挡。</li>
                          </ul>
                       </section>
                       <section>
